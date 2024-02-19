@@ -156,8 +156,8 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
 
         pm.beginTask("Find outlets...", rows); //$NON-NLS-1$
         List<FlowNode> exitsList = new ArrayList<FlowNode>();
-        for( int r = 0; r < rows; r++ ) {
-            for( int c = 0; c < cols; c++ ) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
                 double netValue = netIter.getSampleDouble(c, r, 0);
                 if (isNovalue(netValue)) {
                     // we make sure that we pick only outlets that are on the net
@@ -178,9 +178,10 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
             pm.worked(1);
         }
         pm.done();
-        
-        if (exitsList.size()==0) {
-            throw new ModelsIllegalargumentException("No outlet has been found in the network. Check your data.", this, pm);
+
+        if (exitsList.size() == 0) {
+            throw new ModelsIllegalargumentException("No outlet has been found in the network. Check your data.", this,
+                    pm);
         }
 
         SimpleFeatureTypeBuilder b = new SimpleFeatureTypeBuilder();
@@ -200,7 +201,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
         networkBuilder = new SimpleFeatureBuilder(type);
 
         pm.beginTask("Extract vectors...", exitsList.size());
-        for( FlowNode exitNode : exitsList ) {
+        for (FlowNode exitNode : exitsList) {
             /*
              * - first hack order is 1
              */
@@ -216,12 +217,12 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
          * connect channels
          */
         channels = new ArrayList<NetworkChannel>();
-        for( SimpleFeature network : networkList ) {
+        for (SimpleFeature network : networkList) {
             channels.add(new NetworkChannel(network));
         }
         pm.beginTask("Connect channels...", channels.size());
-        for( NetworkChannel channel : channels ) {
-            for( NetworkChannel checkChannel : channels ) {
+        for (NetworkChannel channel : channels) {
+            for (NetworkChannel checkChannel : channels) {
                 if (channel.equals(checkChannel)) {
                     continue;
                 }
@@ -251,18 +252,16 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
     }
 
     private void calculatePfafstetter() {
-        for( int i = 1; i <= maxHack; i++ ) {
-            // find a channel of that order
-            List<NetworkChannel> startChannels = new ArrayList<NetworkChannel>();
-            for( NetworkChannel channel : channels ) {
+        List<String> pfafList = new ArrayList<>();
+        for (int i = 1; i <= this.maxHack; i++) {
+            List<NetworkChannel> startChannels = new ArrayList<>();
+            for (NetworkChannel channel : this.channels) {
                 int hack = channel.getHack();
                 NetworkChannel nextChannel = channel.getNextChannel();
-                if (hack == i && (nextChannel == null || nextChannel.getHack() != i)) {
+                if (hack == i && (nextChannel == null || nextChannel.getHack() != i))
                     startChannels.add(channel);
-                }
             }
-
-            for( NetworkChannel startChannel : startChannels ) {
+            for (NetworkChannel startChannel : startChannels) {
                 NetworkChannel nextChannel = startChannel.getNextChannel();
                 String base = "";
                 if (nextChannel != null) {
@@ -270,31 +269,38 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
                     int lastDot = base.lastIndexOf('.');
                     if (lastDot == -1) {
                         int lastInt = Integer.parseInt(base);
-                        lastInt = lastInt + 1;
+                        lastInt++;
                         base = lastInt + ".";
                     } else {
                         String prefix = base.substring(0, lastDot + 1);
                         String last = base.substring(lastDot + 1);
                         int lastInt = Integer.parseInt(last);
-                        lastInt = lastInt + 1;
+                        lastInt++;
                         base = prefix + lastInt + ".";
                     }
                 }
                 int index = 1;
+                String pfaf = base + index;
                 startChannel.setPfafstetter(base + index);
-                index = index + 2;
-                while( startChannel.getPreviousChannels().size() > 0 ) {
+                index += 2;
+                while (startChannel.getPreviousChannels().size() > 0) {
                     List<NetworkChannel> previousChannels = startChannel.getPreviousChannels();
-                    for( NetworkChannel networkChannel : previousChannels ) {
+                    for (NetworkChannel networkChannel : previousChannels) {
                         if (networkChannel.getHack() == i) {
                             startChannel = networkChannel;
+                            pfaf = base + index;
                             startChannel.setPfafstetter(base + index);
-                            index = index + 2;
-                            break;
+                            index += 2;
                         }
                     }
                 }
-
+                // TODO add flag to check
+                if (pfafList.contains(pfaf)) {
+                    pfaf = base + index;
+                    startChannel.setPfafstetter(base + index);
+                    index += 2;
+                }
+                pfafList.add(pfaf);
             }
         }
     }
@@ -302,7 +308,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
     private void calculateStrahler() {
         // calculate Strahler
         List<NetworkChannel> sourceChannels = new ArrayList<NetworkChannel>();
-        for( NetworkChannel channel : channels ) {
+        for (NetworkChannel channel : channels) {
             if (channel.isSource()) {
                 sourceChannels.add(channel);
                 // set start
@@ -312,12 +318,12 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
 
         List<NetworkChannel> nextsList = new ArrayList<NetworkChannel>();
         List<NetworkChannel> toKeepList = new ArrayList<NetworkChannel>();
-        while( true ) {
+        while (true) {
             sourceChannels.addAll(nextsList);
             nextsList.clear();
             sourceChannels.addAll(toKeepList);
             toKeepList.clear();
-            for( NetworkChannel sourceChannel : sourceChannels ) {
+            for (NetworkChannel sourceChannel : sourceChannels) {
                 NetworkChannel nextChannel = sourceChannel.getNextChannel();
                 if (nextChannel != null) {
                     if (!nextsList.contains(nextChannel))
@@ -328,7 +334,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
                 break;
             }
 
-            for( NetworkChannel networkChannel : nextsList ) {
+            for (NetworkChannel networkChannel : nextsList) {
                 List<NetworkChannel> previousChannels = networkChannel.getPreviousChannels();
                 if (previousChannels.size() == 0) {
                     throw new RuntimeException();
@@ -337,7 +343,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
                 boolean allEqual = true;
                 int previousStrahler = -1;
                 boolean doContinue = false;
-                for( NetworkChannel channel : previousChannels ) {
+                for (NetworkChannel channel : previousChannels) {
                     int strahler = channel.getStrahler();
                     if (strahler < 0) {
                         // has not been set yet, keep it
@@ -370,7 +376,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
         }
     }
 
-    private void handleTrail( FlowNode runningNode, Coordinate startCoordinate, int hackIndex ) {
+    private void handleTrail(FlowNode runningNode, Coordinate startCoordinate, int hackIndex) {
         List<Coordinate> lineCoordinatesList = new ArrayList<Coordinate>();
         if (startCoordinate != null) {
             lineCoordinatesList.add(startCoordinate);
@@ -379,7 +385,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
                 runningNode.setValueInMap(hackWIter, hackIndex);
         }
         // if there are entering nodes
-        while( runningNode.getEnteringNodes().size() > 0 ) {
+        while (runningNode.getEnteringNodes().size() > 0) {
             int col = runningNode.col;
             int row = runningNode.row;
             Coordinate coord = CoverageUtilities.coordinateFromColRow(col, row, gridGeometry);
@@ -393,7 +399,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
                     runningNode.setValueInMap(hackWIter, hackIndex);
             } else {
                 /*
-                 * the line is finished 
+                 * the line is finished
                  */
                 if (lineCoordinatesList.size() < 2) {
                     throw new RuntimeException();
@@ -406,7 +412,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
             List<FlowNode> enteringNodes = runningNode.getEnteringNodes();
             List<FlowNode> checkedNodes = new ArrayList<FlowNode>();
             // we need to check which ones are really net nodes
-            for( FlowNode tmpNode : enteringNodes ) {
+            for (FlowNode tmpNode : enteringNodes) {
                 int tmpCol = tmpNode.col;
                 int tmpRow = tmpNode.row;
                 double tmpNetValue = netIter.getSampleDouble(tmpCol, tmpRow, 0);
@@ -415,33 +421,23 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
                 }
             }
             if (checkedNodes.size() == 1) {
-                // normal, get the next upstream node and go on
-                runningNode = checkedNodes.get(0);
+                FlowNode newRunningNode = checkedNodes.get(0);
+                double newTmpNetValue = netIter.getSampleDouble(newRunningNode.col, newRunningNode.row, 0);
+                double oldTmpNetValue = netIter.getSampleDouble(runningNode.col, runningNode.row, 0);
+                if (newTmpNetValue == oldTmpNetValue) {
+                    runningNode = newRunningNode;
+                    continue;
+                } else {
+                    // TODO add flag to check
+                    handleOneOrMoreNodes(lineCoordinatesList, hackIndex, checkedNodes, runningNode, coord);
+                    break;
+                }
             } else if (checkedNodes.size() == 0) {
                 // it was an exit
                 createLine(lineCoordinatesList, hackIndex);
                 break;
             } else if (checkedNodes.size() > 1) {
-
-                createLine(lineCoordinatesList, hackIndex);
-
-                if (tcaIter == null) {
-                    // we just extract the vector line
-                    for( FlowNode flowNode : checkedNodes ) {
-                        handleTrail(flowNode, coord, hackIndex + 1);
-                    }
-                } else {
-                    // we want also hack numbering and friends
-                    FlowNode mainUpstream = runningNode.getUpstreamTcaBased(tcaIter, null);
-                    // the main channel keeps the same index
-                    handleTrail(mainUpstream, coord, hackIndex);
-                    // the others jump up one
-                    for( FlowNode flowNode : checkedNodes ) {
-                        if (!flowNode.equals(mainUpstream)) {
-                            handleTrail(flowNode, coord, hackIndex + 1);
-                        }
-                    }
-                }
+                handleOneOrMoreNodes(lineCoordinatesList, hackIndex, checkedNodes, runningNode, coord);
                 break;
             } else {
                 throw new RuntimeException();
@@ -449,7 +445,34 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
         }
     }
 
-    private void createLine( List<Coordinate> lineCoordinatesList, int hackindex ) {
+    private void handleOneOrMoreNodes(
+            List<Coordinate> lineCoordinatesList,
+            int hackIndex,
+            List<FlowNode> checkedNodes,
+            FlowNode runningNode,
+            Coordinate coord) {
+        createLine(lineCoordinatesList, hackIndex);
+
+        if (tcaIter == null) {
+            // we just extract the vector line
+            for (FlowNode flowNode : checkedNodes) {
+                handleTrail(flowNode, coord, hackIndex + 1);
+            }
+        } else {
+            // we want also hack numbering and friends
+            FlowNode mainUpstream = runningNode.getUpstreamTcaBased(tcaIter, null);
+            // the main channel keeps the same index
+            handleTrail(mainUpstream, coord, hackIndex);
+            // the others jump up one
+            for (FlowNode flowNode : checkedNodes) {
+                if (!flowNode.equals(mainUpstream)) {
+                    handleTrail(flowNode, coord, hackIndex + 1);
+                }
+            }
+        }
+    }
+
+    private void createLine(List<Coordinate> lineCoordinatesList, int hackindex) {
         if (lineCoordinatesList.size() < 2) {
             return;
         }
@@ -460,7 +483,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
         newNetLine = (LineString) newNetLine.reverse();
         Object[] values;
         if (inDem == null) {
-            values = new Object[]{newNetLine, hackindex, 0, "-"};
+            values = new Object[] { newNetLine, hackindex, 0, "-" };
         } else {
             Point startPoint = newNetLine.getStartPoint();
             Point endPoint = newNetLine.getEndPoint();
@@ -472,7 +495,7 @@ public class OmsNetworkAttributesBuilder extends JGTModel {
             p.setLocation(endPoint.getX(), endPoint.getY());
             inDem.evaluate(p, value);
             double endElev = value[0];
-            values = new Object[]{newNetLine, hackindex, 0, "-", startElev, endElev};
+            values = new Object[] { newNetLine, hackindex, 0, "-", startElev, endElev };
         }
         networkBuilder.addAll(values);
         SimpleFeature netFeature = networkBuilder.buildFeature(null);
